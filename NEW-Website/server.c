@@ -884,9 +884,25 @@ if (portEnv != NULL) {
         if(client<0) continue;
 
         char req[BUF];
-        int n=recv(client,req,BUF-1,0);
-        if(n<=0){ close(client); continue; }
-        req[n]=0;
+        int n = recv(client, req, BUF - 1, 0);
+        if (n <= 0) { close(client); continue; }
+        req[n] = 0;
+
+        /* --- โค้ดส่วนที่เพิ่ม: รอรับข้อมูล JSON Body ให้ครบ --- */
+        char *header_end = strstr(req, "\r\n\r\n");
+        char *cl_ptr = strstr(req, "Content-Length: ");
+        int content_len = cl_ptr ? atoi(cl_ptr + 16) : 0;
+        
+        if (header_end && content_len > 0) {
+            int header_len = (header_end - req) + 4;
+            while ((n - header_len) < content_len && n < BUF - 1) {
+                int more = recv(client, req + n, BUF - 1 - n, 0);
+                if (more <= 0) break;
+                n += more;
+                req[n] = 0;
+            }
+        }
+        /* ------------------------------------------------ */
 
         /* แยก method และ path */
         char method[8]="", path[256]="";
