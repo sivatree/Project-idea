@@ -50,7 +50,7 @@ void send_confirmation_email(const char* to_email, const char* refCode, const ch
     shell_escape(car, esc_car, sizeof(esc_car));
     char cmd[2048];
 
-    snprintf(cmd, sizeof(cmd), "python3 send_email.py \"book\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", to_email, esc_fname, esc_lname, esc_car, start, end, total);
+    snprintf(cmd, sizeof(cmd), "python send_email.py \"book\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", to_email, esc_fname, esc_lname, esc_car, start, end, total);
     printf("[MAIL DEBUG] Executing command: %s\n", cmd);
 
     FILE *fp = popen(cmd, "r");
