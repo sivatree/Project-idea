@@ -11,7 +11,7 @@
  */
 
 const API = (() => {
-  const BASE = 'http://localhost:8080';
+  const BASE = 'https://project-car-pjo3.onrender.com';
 
   /* ─── ตรวจสอบว่า C server ทำงานอยู่ไหม ─── */
   async function isServerAlive() {
