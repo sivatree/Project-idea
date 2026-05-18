@@ -17,8 +17,6 @@
   #include <arpa/inet.h>
 #endif
 
-/* ─── config ─────────────────────────────────────────────── */
-
 #define BUF         65536
 #define MAX_CARS    20
 #define MAX_DAYS    370
@@ -29,7 +27,6 @@ static void sendResponse(int sock, int code, const char *body);
 static int getJsonStr(const char *json, const char *key, char *out, int outLen);
 static void dayIndexToDate(int dayIdx, char *out);
 
-/* ─── send-mail via Python ─────────────────────────────── */
 static void shell_escape(const char *src, char *dst, int dstLen) {
     int j = 0;
     for (int i = 0; src[i] && j < dstLen-5; i++)
@@ -49,7 +46,6 @@ static void shell_escape(const char *src, char *dst, int dstLen) {
 }
 
 void send_confirmation_email(const char* to_email, const char* refCode, const char* fname, const char* lname, const char* car, const char* start, const char* end, const char* total) {
-    
     char esc_fname[128], esc_lname[128], esc_car[128];
     shell_escape(fname, esc_fname, sizeof(esc_fname));
     shell_escape(lname, esc_lname, sizeof(esc_lname));
@@ -58,38 +54,22 @@ void send_confirmation_email(const char* to_email, const char* refCode, const ch
 
     snprintf(cmd, sizeof(cmd), 
     "python send_email.py \"book\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", 
-    to_email,     // argv[2]
-    refCode,   // argv[3] -> ต้องเป็นเลขจอง ไม่ใช่ชื่อ!
-    fname,     // argv[4]
-    lname,     // argv[5]
-    car,   // argv[6]
-    start, // argv[7]
-    end,   // argv[8]
-    total // argv[9]
-);
+    to_email, refCode, fname, lname, car, start, end, total);
+    
     FILE *fp = popen(cmd, "r");
-    if (fp == NULL)
-    {
-        perror("[MAIL ERROR] Cannot open pipe to python");
-        return;
-    }
+    if (fp == NULL) return;
 
     char buffer[512];
     while (fgets(buffer, sizeof(buffer), fp) != NULL) printf("[PYTHON LOG]: %s", buffer);
-    
-
-    int status = pclose(fp);
-    if (status == 0) printf("[MAIL SUCCESS] Email process finished.\n");
-    else printf("[MAIL ERROR] Python exited with code %d\n", status);
+    pclose(fp);
 }
 
 static void send_email_cmd(const char* mode, const char* to, const char* ref, const char* fn, const char* ln, const char* car, const char* st, const char* en, const char* tot) {
     char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "python send_email.py \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" &",mode, to, ref, fn, ln, car, st, en, tot);    
+    snprintf(cmd, sizeof(cmd), "python send_email.py \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" &",mode, to, ref, fn, ln, car, st, en, tot);   
     system(cmd);
 }
 
-/* ─── car struct ──────────────────────────────────────────── */
 typedef struct {
     int  number;   
     int  id;       
@@ -100,45 +80,36 @@ typedef struct {
 static Car cars[MAX_CARS];
 int numCars = 0;
 
-/* ─── helper: leap year ───────────────────────────────────── */
 static int isLeap(int y){
     return (y%4==0 && y%100!=0)||(y%400==0);
 }
+
 static int daysInMonth(int m,int y){
     int d[]={31,28,31,30,31,30,31,31,30,31,30,31};
     if(m==2&&isLeap(y)) return 29;
     return d[m-1];
 }
-/* แปลง YYYY-MM-DD → day index เทียบกับ 1 ม.ค. ปีเดียวกัน */
+
 static int dateToDayIndex(const char *s){
     if(!s || !s[0]) return -1;
-
     char tmp[64];
     strcpy(tmp, s);
-
-    //  ลบ newline / carriage return
     tmp[strcspn(tmp, "\r\n")] = 0;
 
     int y,m,d;
-    if(sscanf(tmp,"%d-%d-%d",&y,&m,&d)!=3)
-    {
-        printf("PARSE FAIL: [%s]\n", tmp);
-        return -1;
-    }
+    if(sscanf(tmp,"%d-%d-%d",&y,&m,&d)!=3) return -1;
 
     int idx=d;
     for(int i=1;i<m;i++) idx+=daysInMonth(i,y);
-
     int base=2026;
     for(int i=base;i<y;i++) idx+=isLeap(i)?366:365;
 
     return idx;
 }
 
-/* ─── load CAR.csv ────────────────────────────────────────── */
 static void loadCars(void){
     FILE *fp=fopen(CAR_FILE,"r");
-    if(!fp){ fprintf(stderr,"[ERR] cannot open %s\n",CAR_FILE); return; }
+    if(!fp) return;
 
     char line[20000];
     int row=0;
@@ -176,14 +147,13 @@ static void loadCars(void){
     fclose(fp);
 }
 
-/* ─── save CAR.csv ────────────────────────────────────────── */
 static void saveCars(void){
     FILE *in=fopen(CAR_FILE,"r");
     char header[20000]="";
     if(in){ fgets(header,sizeof(header),in); fclose(in); }
 
     FILE *fp=fopen(CAR_FILE,"w");
-    if(!fp){ fprintf(stderr,"[ERR] cannot write %s\n",CAR_FILE); return; }
+    if(!fp) return;
 
     fprintf(fp,"%s",header);
 
@@ -197,7 +167,6 @@ static void saveCars(void){
     fclose(fp);
 }
 
-/* ─── check availability (returns 1=available, 0=not) ─────── */
 static int isAvailable(int carIdx, int startDay, int endDay){
     Car *c=&cars[carIdx];
     for(int d=startDay;d<=endDay;d++)
@@ -208,7 +177,6 @@ static int isAvailable(int carIdx, int startDay, int endDay){
     return 1;
 }
 
-/* ─── book car ────────────────────────────────────────────── */
 static void bookCar(int carIdx, int startDay, int endDay){
     Car *c=&cars[carIdx];
     for(int d=startDay;d<=endDay;d++)
@@ -219,7 +187,6 @@ static void bookCar(int carIdx, int startDay, int endDay){
     saveCars();
 }
 
-/* ─── cancel car ──────────────────────────────────────────── */
 static void cancelCar(int carIdx, int startDay, int endDay){
     Car *c=&cars[carIdx];
     for(int d=startDay;d<=endDay;d++)
@@ -230,7 +197,6 @@ static void cancelCar(int carIdx, int startDay, int endDay){
     saveCars();
 }
 
-/* ─── append to CUSTOMER.csv ──────────────────────────────── */
 static void saveCustomer(
         const char *carModel,
         const char *fname,    const char *lname,
@@ -244,7 +210,7 @@ static void saveCustomer(
         const char *total){
 
     FILE *fp=fopen(CUST_FILE,"a");
-    if(!fp){ fprintf(stderr,"[ERR] cannot open %s\n",CUST_FILE); return; }
+    if(!fp) return;
 
     time_t now=time(NULL);
     struct tm *t=localtime(&now);
@@ -265,11 +231,9 @@ static void saveCustomer(
         SAFE(timeOrCvv),SAFE(expiry),
         SAFE(total));
     #undef SAFE
-
     fclose(fp);
 }
 
-/* ─── delete customer from CSV ────────────────────────────── */
 static int deleteCustomer(const char *fname, const char *lname, int *outCarIdx, int *outStart, int *outEnd, char *outEmail, char *outModel) {
     FILE *fp=fopen(CUST_FILE,"r");
     if(!fp) return 0;
@@ -335,8 +299,6 @@ static int deleteCustomer(const char *fname, const char *lname, int *outCarIdx, 
     return 1;
 }
 
-
-/* ─── delete customer by name + startDate (admin) ─────────── */
 static int deleteCustomerByKey(const char *fname, const char *lname, const char *startDate,
                                 int *outCarIdx, int *outStart, int *outEnd,
                                 char *outEmail, char *outModel) {
@@ -396,10 +358,6 @@ static int deleteCustomerByKey(const char *fname, const char *lname, const char 
     return 1;
 }
 
-/* ══════════════════════════════════════════════════════════════
-                        HTTP helpers
-   ══════════════════════════════════════════════════════════════ */
-
 static void sendResponse(int sock, int code, const char *body){
     const char *status =  code==200 ? "200 OK"
                         : code==400 ? "400 Bad Request"
@@ -420,7 +378,6 @@ static void sendResponse(int sock, int code, const char *body){
     send(sock,body,strlen(body),0);
 }
 
-/* ดึง query param value จาก URL  ?key=value&... */
 static int getParam(const char *url, const char *key, char *out, int outLen){
     char search[64];
     snprintf(search,sizeof(search),"%s=",key);
@@ -435,43 +392,52 @@ static int getParam(const char *url, const char *key, char *out, int outLen){
     return 1;
 }
 
-/* ดึง JSON string value  "key":"value" */
 static int getJsonStr(const char *json, const char *key, char *out, int outLen){
     char search[64];
     snprintf(search,sizeof(search),"\"%s\"",key);
     const char *p=strstr(json,search);
     if(!p) return 0;
     p+=strlen(search);
-    while(*p && (*p==':'||*p==' '||*p=='\t')) p++;
-    if(*p!='"') return 0;
-    p++;
-    int i=0;
-    while(*p && i<outLen-1){
-        unsigned char ch = (unsigned char)*p;
-        if(ch == '"') break;        
-        if(ch == '\\'){      
-            p++;
-            ch = (unsigned char)*p;
-            switch(ch){
-                case '"':  out[i++]='"';  break;
-                case '\\': out[i++]='\\'; break;
-                case '/':  out[i++]='/';  break;
-                case 'n':  out[i++]='\n'; break;
-                case 'r':  out[i++]='\r'; break;
-                case 't':  out[i++]='\t'; break;
-                case 'u':{
-                    out[i++]='?'; p+=4; /* skip 4 hex digits */
-                    break;
-                }
-                default: out[i++]=(char)ch; break;
-            }
-        } else {
-            out[i++]=(char)ch;
-        }
+    while(*p && (*p==':'||*p==' '||*p=='\t'||*p=='\r'||*p=='\n')) p++;
+    
+    if(*p=='"') {
         p++;
+        int i=0;
+        while(*p && i<outLen-1){
+            unsigned char ch = (unsigned char)*p;
+            if(ch == '"') break;      
+            if(ch == '\\'){      
+                p++;
+                ch = (unsigned char)*p;
+                switch(ch){
+                    case '"':  out[i++]='"';  break;
+                    case '\\': out[i++]='\\'; break;
+                    case '/':  out[i++]='/';  break;
+                    case 'n':  out[i++]='\n'; break;
+                    case 'r':  out[i++]='\r'; break;
+                    case 't':  out[i++]='\t'; break;
+                    case 'u':{
+                        out[i++]='?'; p+=4;
+                        break;
+                    }
+                    default: out[i++]=(char)ch; break;
+                }
+            } else {
+                out[i++]=(char)ch;
+            }
+            p++;
+        }
+        out[i]=0;
+        return 1; 
+    } else if ((*p >= '0' && *p <= '9') || *p == '-') {
+        int i = 0;
+        while(*p && ((*p >= '0' && *p <= '9') || *p == '.') && i < outLen-1) {
+            out[i++] = *p++;
+        }
+        out[i]=0;
+        return 1;
     }
-    out[i]=0;
-    return i>0 || *p=='"'; 
+    return 0;
 }
 
 static int getJsonInt(const char *json, const char *key, int *out){
@@ -481,7 +447,7 @@ static int getJsonInt(const char *json, const char *key, int *out){
     const char *p=strstr(json,search);
     if(!p) return 0;
     p+=strlen(search);
-    while(*p && (*p==':'||*p==' ')) p++;
+    while(*p && (*p==':'||*p==' '||*p=='\t'||*p=='\r'||*p=='\n')) p++;
     int i=0;
     while(*p && (*p=='-'||((*p>='0')&&(*p<='9'))) && i<31) buf[i++]=*p++;
     buf[i]=0;
@@ -489,7 +455,7 @@ static int getJsonInt(const char *json, const char *key, int *out){
     return 1;
 }
 
-static void dayIndexToDate(int dayIdx, char *out){      /* แปลง day index กลับเป็น YYYY-MM-DD (base year 2026) */
+static void dayIndexToDate(int dayIdx, char *out){      
     int year=2026;
     int remaining=dayIdx;
     int daysInYear;
@@ -505,10 +471,6 @@ static void dayIndexToDate(int dayIdx, char *out){      /* แปลง day inde
     while(remaining>d[month]){ remaining-=d[month]; month++; }
     sprintf(out,"%04d-%02d-%02d",year,month+1,remaining);
 }
-
-/* ══════════════════════════════════════════════════════════════
-                        Handlers
-   ══════════════════════════════════════════════════════════════ */
 
 static void handleAvailability(int sock, const char *url){
     char startStr[20]="", endStr[20]="";
@@ -543,12 +505,6 @@ static void handleAvailability(int sock, const char *url){
     sendResponse(sock,200,body);
 }
 
-/*  POST /book
-    Body JSON:
-    { "carNumber":1, "startDate":"2026-04-15", "endDate":"2026-04-17",
-        "firstName":"สมชาย", "lastName":"ใจดี",
-        "phone":"0812345678", "email":"a@gmail.com", "delivery":"สมุทรสาคร-เซ็นทรัลมหาชัย" }
-*/
 static void handleBook(int sock, const char *body){
     int carNumber=0;
     char startDate[20]="",  endDate[20]="";
@@ -573,8 +529,6 @@ static void handleBook(int sock, const char *body){
     getJsonStr(body,"expiry",      expiry,     12);
     getJsonStr(body,"total",       total,      20);
 
-    printf("[BOOK] carNumber=%d start=%s end=%s fname=%s lname=%s pay=%s total=%s\n",carNumber, startDate, endDate, fname, lname, payMethod, total);
-
     if(carNumber<1||!startDate[0]||!endDate[0]||!fname[0]||!lname[0]){sendResponse(sock,400,"{\"ok\":false,\"error\":\"missing fields\"}");return;}
     loadCars();
     int carIdx=-1;
@@ -592,7 +546,6 @@ static void handleBook(int sock, const char *body){
 
     snprintf(refCode,sizeof(refCode),"RM-%06d",100000+(rand()%900000));
     saveCustomer(cars[carIdx].model, fname, lname, phone, email, idCard, startDate, endDate, location, payMethod, cardName, cardNumber, timeOrCvv, expiry, total);
-    printf("[MAIL] sendto: %s\n", email);
     send_confirmation_email(email,refCode,fname,lname,cars[carIdx].model,startDate,endDate,total);
 
     int numDays=(e-s)+1;
@@ -621,7 +574,6 @@ static void handleCancel(int sock, const char *body) {
         send_email_cmd("cancel", email, "CANCELLED", fname, lname, model, sDate, eDate, "0");
         sendResponse(sock, 200, "{\"ok\":true}");
     } else {
-        printf("[DEBUG] not found: %s %s\n", fname, lname);
         sendResponse(sock, 200, "{\"ok\":false,\"error\":\"ไม่พบข้อมูลการจอง โปรดตรวจสอบชื่อและนามสกุล\"}");
     }
 }
@@ -648,20 +600,17 @@ static void handleAdminCancel(int sock, const char *body) {
         if (email[0]) send_email_cmd("cancel", email, "CANCELLED", fname, lname, model, sDate, eDate, "0");
         sendResponse(sock, 200, "{\"ok\":true}");
     } else {
-        printf("[ADMINCANCEL] not found: %s %s start=%s\n", fname, lname, startDate);
         sendResponse(sock, 200, "{\"ok\":false,\"error\":\"ไม่พบข้อมูลการจอง\"}");
     }
 }
 
 void handleMyBookings(int client, const char *jsonBody) {
-    /* ── parse ชื่อ-นามสกุลจาก JSON ด้วย getJsonStr ที่รองรับ UTF-8 ── */
     char reqF[256]="", reqL[256]="";
     if(!getJsonStr(jsonBody,"firstName",reqF,256)) getJsonStr(jsonBody,"first_name",reqF,256);
     if(!getJsonStr(jsonBody,"lastName",reqL,256)) getJsonStr(jsonBody,"last_name",reqL,256);
     if(!reqF[0]||!reqL[0]) { sendResponse(client,400,"{\"ok\":false,\"error\":\"missing name\"}");return; }
     FILE *f = fopen(CUST_FILE, "r");
     if(!f) {
-        fprintf(stderr,"[ERR] cannot open %s\n", CUST_FILE);
         sendResponse(client, 500, "{\"ok\":false,\"error\":\"Cannot open customer database\"}");
         return;
     }
@@ -695,7 +644,6 @@ void handleMyBookings(int client, const char *jsonBody) {
             carEsc[ei++] = col[0][k];
         }
         carEsc[ei]=0;
-        /* new column layout */
         const char *startDate  = (nc>6)  ? col[6]  : ""; const char *endDate    = (nc>7)  ? col[7]  : "";
         const char *location   = (nc>8)  ? col[8]  : ""; const char *recordDate = (nc>9)  ? col[9]  : "";
         const char *payMethod  = (nc>10) ? col[10] : ""; const char *total      = (nc>15) ? col[15] : "";
@@ -707,7 +655,6 @@ void handleMyBookings(int client, const char *jsonBody) {
     }
     fclose(f);
     pos += snprintf(resbuf+pos, sizeof(resbuf)-pos, "]}");
-    printf("[MYBOOKINGS] fname=%s lname=%s found=%d\n", reqF, reqL, found);
     sendResponse(client, 200, resbuf);
 }
 
@@ -721,7 +668,6 @@ static void handleAllBookings(int sock, const char *url) {
     for(char *p=qLoc;  *p; p++) if(*p=='+') *p=' ';
     FILE *f = fopen(CUST_FILE, "r");
     if(!f){
-        fprintf(stderr,"[ERR] cannot open %s\n", CUST_FILE);
         sendResponse(sock,500,"{\"ok\":false,\"error\":\"Cannot open customer database\"}");
         return;}
     #define MAX_ROWS 2000
@@ -784,15 +730,12 @@ static void handleAllBookings(int sock, const char *url) {
         char *expiry     = (r->nc>14)? r->col[14]: "";
         char *totalStr   = (r->nc>15)? r->col[15]: "0";
 
-        /* ── compute row status ── */
         char rowStatus[12] = "past";
         if(startDate[0] && endDate[0]){
             if(strcmp(todayStr, startDate) < 0)       strcpy(rowStatus,"upcoming");
             else if(strcmp(todayStr, endDate) <= 0)   strcpy(rowStatus,"active");
         }
 
-        /* ── apply filters ── */
-        /* car filter (case-insensitive substring) */
         if(qCar[0]){
             char carLower[64]="", qLower[64]="";
             for(int k=0;car[k]&&k<63;k++)    carLower[k] = (char)tolower((unsigned char)car[k]);
@@ -841,16 +784,12 @@ static void handleAllBookings(int sock, const char *url) {
     pos += snprintf(resbuf+pos, 1024*1024-pos,"],\"totalRows\":%d,\"totalRevenue\":%d}", found, total_revenue);
 
     free(rows);
-    printf("[ADMIN] allbookings found=%d\n", found);
     sendResponse(sock, 200, resbuf);
     free(resbuf);
     #undef MAX_ROWS
     #undef MAX_COL
 }
 
-/* ══════════════════════════════════════════════════════════════
-                        Main server loop
-   ══════════════════════════════════════════════════════════════ */
 int main(void){
 int PORT = 8080;
 char* portEnv = getenv("PORT");
@@ -872,28 +811,48 @@ if (portEnv != NULL) {PORT = atoi(portEnv);}
     printf("[INFO] RODCHAOMAHACHAI backend running on http://localhost:%d\n",PORT);
     printf("[INFO] Place CAR.csv and CUSTOMER.csv in the same directory.\n");
     printf("[INFO] Press Ctrl+C to stop.\n");
+    
     while(1){
         struct sockaddr_in caddr;
         socklen_t clen=sizeof(caddr);
         int client=accept(server,(struct sockaddr*)&caddr,&clen);
         if(client<0) continue;
+        
         char req[BUF];
-        int n=recv(client,req,BUF-1,0);
-        if(n<=0){ close(client); continue; }
-        req[n]=0;
-        /* แยก method และ path */
+        int n = recv(client, req, BUF - 1, 0);
+        if(n <= 0) { close(client); continue; }
+        req[n] = 0;
+
+        char *bodyStart = strstr(req, "\r\n\r\n");
+        if (!bodyStart) bodyStart = strstr(req, "\n\n");
+
+        if (bodyStart) {
+            int hdrLen = (bodyStart - req) + (bodyStart[0] == '\r' ? 4 : 2);
+            char *clPtr = strstr(req, "Content-Length:");
+            if (!clPtr) clPtr = strstr(req, "content-length:");
+            if (clPtr) {
+                int contentLen = atoi(clPtr + 15);
+                while ((n - hdrLen) < contentLen && n < BUF - 1) {
+                    int n2 = recv(client, req + n, BUF - 1 - n, 0);
+                    if (n2 <= 0) break;
+                    n += n2;
+                    req[n] = 0;
+                }
+            }
+            bodyStart = strstr(req, "\r\n\r\n");
+            if (!bodyStart) bodyStart = strstr(req, "\n\n");
+        }
+        const char *jsonBody = bodyStart ? bodyStart + (bodyStart[0] == '\r' ? 4 : 2) : "";
+
         char method[8]="", path[256]="";
         sscanf(req,"%7s %255s",method,path);
-        printf("[REQ] %s %s\n",method,path);
-        /* OPTIONS preflight (CORS) */
+        
         if(strcmp(method,"OPTIONS")==0)
         {
             sendResponse(client,200,"{}");
             close(client); continue;
         }
-        /* หา body (หลัง \r\n\r\n) */
-        const char *bodyStart=strstr(req,"\r\n\r\n");
-        const char *jsonBody = bodyStart ? bodyStart+4 : "";
+        
         if(strncmp(path,"/availability",13)==0) handleAvailability(client, path);
         else if(strcmp(path,"/book")==0 && strcmp(method,"POST")==0) handleBook(client, jsonBody);
         else if(strcmp(path,"/cancel")==0 && strcmp(method,"POST")==0) handleCancel(client, jsonBody);
@@ -902,6 +861,7 @@ if (portEnv != NULL) {PORT = atoi(portEnv);}
         else if(strncmp(path,"/allbookings",12)==0 && strcmp(method,"GET")==0) handleAllBookings(client, path);
         else if(strcmp(path,"/status")==0) sendResponse(client,200,"{\"ok\":true,\"service\":\"RODCHAOMAHACHAI\"}");
         else sendResponse(client,404,"{\"ok\":false,\"error\":\"not found\"}");
+        
         close(client);
     }
 #ifdef _WIN32
