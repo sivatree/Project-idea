@@ -158,24 +158,30 @@ async function searchCarsFromServer() {
  * ส่งข้อมูลไป C backend บันทึก CSV แล้วแสดงหน้า success
  */
 async function confirmPaymentToServer() {
-  /* ── 1. ข้อมูลผู้เช่า ── */
-  const fname  = document.querySelector('#page-payment input[placeholder="ชื่อ"]')?.value.trim()       || '';
-  const lname  = document.querySelector('#page-payment input[placeholder="นามสกุล"]')?.value.trim()   || '';
-  const phone  = document.querySelector('#page-payment input[type="tel"]')?.value.trim()              || '';
-  const email  = document.querySelector('#page-payment input[type="email"]')?.value.trim()            || '';
-  const idCard = document.getElementById('idcard').value;
+  const btn = document.querySelector('#page-payment .btn-primary:last-of-type');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...'; }
+
+  const fname  = document.querySelector('#page-payment input[placeholder="ชื่อ"]')?.value.trim() || '';
+  const lname  = document.querySelector('#page-payment input[placeholder="นามสกุล"]')?.value.trim() || '';
+  const phone  = document.querySelector('#page-payment input[type="tel"]')?.value.trim() || '';
+  const email  = document.querySelector('#page-payment input[type="email"]')?.value.trim() || '';
+  const idCard = document.getElementById('idcard')?.value.trim() || '';
 
   if (!fname || !lname || !phone || !email) {
     toast('กรุณากรอกข้อมูลผู้เช่าให้ครบถ้วน (ชื่อ นามสกุล เบอร์โทร อีเมล)', 'warning');
+    if (btn) { btn.disabled = false; btn.textContent = '✔ ยืนยันการจองและชำระเงิน'; }
     return;
   }
-  if (!selectedCar) { toast('เกิดข้อผิดพลาด: ไม่ได้เลือกรถ', 'error'); return; }
+  
+  if (!selectedCar) { 
+    toast('เกิดข้อผิดพลาด: ไม่ได้เลือกรถ', 'error'); 
+    if (btn) { btn.disabled = false; btn.textContent = '✔ ยืนยันการจองและชำระเงิน'; }
+    return; 
+  }
 
-  /* ── 2. ที่อยู่รับรถ ── */
-  const deliverySel   = document.getElementById('delivery');
-  let   deliveryValue = deliverySel?.value || '';
+  const deliverySel = document.getElementById('delivery');
+  let deliveryValue = deliverySel?.value || '';
 
-  /* ถ้าลูกค้าเลือกปักหมุด ให้ใช้พิกัดจริงแทน string "custom-map" */
   if (deliveryValue === 'custom-map') {
     const lat = deliverySel?.dataset.customLat;
     const lng = deliverySel?.dataset.customLng;
@@ -188,8 +194,6 @@ async function confirmPaymentToServer() {
     }
   }
 
-
-  /* ── 3. วิธีชำระเงิน — อ่านตาม section ที่ active ── */
   const activeMethod = document.querySelector('.pay-method.selected');
   const methodType = activeMethod?.getAttribute('data-method');
 
@@ -199,50 +203,45 @@ async function confirmPaymentToServer() {
   let timeOrCvv  = '';
   let expiry     = '';
 
-if (methodType === 'credit' || !methodType) {
-  payMethod = 'Credit-Card';
-  const sec = document.getElementById('credit-section');
+  if (methodType === 'credit' || !methodType) {
+    payMethod = 'Credit-Card';
+    const sec = document.getElementById('credit-section');
+    cardName   = sec?.querySelector('#card-name')?.value || '-';
+    expiry     = sec?.querySelector('#card-exp')?.value || '-';
+    timeOrCvv  = sec?.querySelector('#card-cvv')?.value || '-';
+    cardNumber = sec?.querySelector('#card-num')?.value.replace(/\s+/g, '') || '-';
+  } else if (methodType === 'qr') {
+    payMethod = 'Promptpay';
+    const sec = document.getElementById('qr-section');
+    cardName   = sec?.querySelector('#card-name')?.value || '-';
+    expiry     = sec?.querySelector('#card-exp')?.value || '-';
+    timeOrCvv  = sec?.querySelector('#card-cvv')?.value || '-';
+    cardNumber = sec?.querySelector('#card-num')?.value || '-';
+  } else if (methodType === 'bank') {
+    payMethod = 'Bank-Transfer';
+    const sec = document.getElementById('bank-section');
+    cardName   = sec?.querySelector('#card-name')?.value || '-';
+    expiry     = sec?.querySelector('#card-exp')?.value || '-';
+    timeOrCvv  = sec?.querySelector('#card-cvv')?.value || '-';
+    cardNumber = sec?.querySelector('#card-num')?.value || '-';
+  }
 
-  cardName   = sec.querySelector('#card-name')?.value || '-';
-  expiry     = sec.querySelector('#card-exp')?.value || '-';
-  timeOrCvv  = sec.querySelector('#card-cvv')?.value || '-';
-  cardNumber = sec.querySelector('#card-num')?.value.replace(/\s+/g, '') || '-';
-
-} else if (methodType === 'qr') {
-  payMethod = 'Promptpay';
-  const sec = document.getElementById('qr-section');
-
-  cardName   = sec.querySelector('#card-name')?.value || '-';
-  expiry     = sec.querySelector('#card-exp')?.value || '-';
-  timeOrCvv  = sec.querySelector('#card-cvv')?.value || '-';
-  cardNumber = sec.querySelector('#card-num')?.value || '-';
-
-} else if (methodType === 'bank') {
-  payMethod = 'Bank-Transfer';
-  const sec = document.getElementById('bank-section');
-
-  cardName   = sec.querySelector('#card-name')?.value || '-';
-  expiry     = sec.querySelector('#card-exp')?.value || '-';
-  timeOrCvv  = sec.querySelector('#card-cvv')?.value || '-';
-  cardNumber = sec.querySelector('#card-num')?.value || '-';
-}
-
-  /* ── 4. ยอดรวม ── */
-  const totalText       = document.getElementById('sum-total')?.textContent || '';
-  const total           = totalText.replace(/,/g,'').replace(/฿/g,'').trim();
+  const totalText = document.getElementById('sum-total')?.textContent || '';
+  const totalString = totalText.replace(/,/g,'').replace(/฿/g,'').trim();
   const deliveryCostNum = parseInt((document.getElementById('sum-delivery')?.textContent || '0').replace(/,/g,'')) || 0;
-  const totalNum        = parseInt(total) || 0;
-  const rentCostNum     = totalNum - deliveryCostNum - 3000;
+  
+  const totalNum = parseInt(totalString) || 0; 
+  const rentCostNum = totalNum - deliveryCostNum - 3000;
 
-  /* ── 5. ส่งไป server ── */
-  const btn = document.querySelector('#page-payment .btn-primary:last-of-type');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...'; }
   showSpinner('กำลังบันทึกการจอง', 'กรุณาอย่าปิดหน้าต่าง...');
+
+  const safeStartDate = document.getElementById('start-date')?.value || startDate;
+  const safeEndDate = document.getElementById('end-date')?.value || endDate;
 
   try {
     const alive = await API.isServerAlive();
+    
     if (!alive) {
-      console.warn('[API] C server offline — local confirm only');
       const ref = 'RM-' + Math.floor(100000 + Math.random() * 900000);
       document.getElementById('booking-ref-num').textContent = ref;
       _showSuccessCarInfo({ fname, lname, phone, email, rentCost: rentCostNum, deliveryCost: deliveryCostNum, total: totalNum });
@@ -254,26 +253,37 @@ if (methodType === 'credit' || !methodType) {
     }
 
     const carNumber = selectedCar.serverNumber;
+    
     if (!carNumber) {
       toast('เกิดข้อผิดพลาด: ไม่พบหมายเลขรถ', 'error');
       if (btn) { btn.disabled = false; btn.textContent = '✔ ยืนยันการจองและชำระเงิน'; }
+      hideSpinner();
       return;
     }
 
     const result = await API.book({
-      carNumber, startDate, endDate,
-      firstName: fname, lastName: lname,
-      phone, email, idCard,
+      carNumber, 
+      startDate: safeStartDate, 
+      endDate: safeEndDate,
+      firstName: fname, 
+      lastName: lname,
+      phone, 
+      email, 
+      idCard,
       deliveryValue,
-      payMethod, cardName, cardNumber,
-      timeOrCvv, expiry, total
+      payMethod, 
+      cardName, 
+      cardNumber,
+      timeOrCvv, 
+      expiry, 
+      total: totalNum
     });
 
     if (btn) { btn.disabled = false; btn.textContent = '✔ ยืนยันการจองและชำระเงิน'; }
 
     if (!result.ok) {
       hideSpinner();
-      toast('ไม่สามารถจองได้: ' + (result.error || 'unknown'), 'error');
+      toast('ไม่สามารถจองได้: ' + (result.error || result.message || 'ข้อมูลไม่สมบูรณ์'), 'error');
       return;
     }
 
@@ -284,7 +294,6 @@ if (methodType === 'credit' || !methodType) {
     showPage('success');
 
   } catch (err) {
-    console.error('[API] book error:', err);
     if (btn) { btn.disabled = false; btn.textContent = '✔ ยืนยันการจองและชำระเงิน'; }
     hideSpinner();
     toast('ไม่สามารถเชื่อมต่อ server ได้ กรุณาลองใหม่', 'error');
