@@ -11,7 +11,7 @@
  */
 
 const API = (() => {
-  const BASE = 'https://project-jong-rod.onrender.com/';//ตรงนี้ต้องแก้
+  const BASE = 'https://project-car-pjo3.onrender.com';//ตรงนี้ต้องแก้
 
   /* ─── ตรวจสอบว่า C server ทำงานอยู่ไหม ─── */
   async function isServerAlive() {
