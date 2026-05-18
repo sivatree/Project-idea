@@ -1135,3 +1135,72 @@ input[type="date"] {
   .cars-header h2 { font-size: 28px; }
   .payment-header h2 { font-size: 30px; }
 }
+/* =========================================================
+   SUCCESS PAGE (จัดหน้าจองสำเร็จให้อยู่กึ่งกลางและกางออกสวยงาม)
+   ========================================================= */
+
+/* กล่องคลุมเนื้อหาหลัก */
+.success-content {
+    width: 100% !important;
+    max-width: 800px !important; /* กำหนดความกว้างบนจอคอม */
+    margin: 40px auto !important; /* ดันให้อยู่กึ่งกลางหน้าจอ */
+    display: block !important;
+    padding: 0 20px;
+}
+
+/* 1. จัดไอคอนและข้อความส่วนหัวให้อยู่ตรงกลาง */
+.success-content .success-icon,
+.success-content h2,
+.success-content p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 2. บังคับให้กล่องข้อมูลผู้เช่า สรุปค่าใช้จ่าย และหมายเลขการจอง กางเต็มพื้นที่ */
+.success-content .success-section,
+.success-content .booking-ref {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+    box-sizing: border-box;
+    margin: 16px auto !important; /* เว้นระยะห่างระหว่างกล่อง */
+}
+
+/* 3. จัดการรูปรถและข้อมูลรถให้อยู่ตรงกลาง */
+.success-car-info {
+    display: flex;
+    flex-direction: column; /* เรียงจากบนลงล่าง */
+    align-items: center; /* จับให้อยู่กึ่งกลางแนวนอน */
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    margin: 40px 0; /* เว้นระยะบนล่างให้ดูโปร่ง */
+    gap: 16px; /* ระยะห่างระหว่างรูปรถกับตัวหนังสือ */
+}
+
+.success-car-img {
+    max-width: 400px !important; /* ล็อคขนาดรูปรถไม่ให้ใหญ่เกินไป */
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.success-car-name {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.success-car-dates {
+    font-size: 15px;
+    color: var(--muted);
+}
+
+/* 4. จัดปุ่มกลับหน้าหลักให้อยู่ตรงกลาง */
+.success-content .btn-home {
+    display: block;
+    margin: 30px auto 0 auto;
+}
