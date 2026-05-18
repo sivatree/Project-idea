@@ -897,7 +897,7 @@ if (portEnv != NULL) {PORT = atoi(portEnv);}
         if(strcmp(method,"OPTIONS")==0)
         {
             sendResponse(client,200,"{}");
-            close(client); continue;
+            
         }
         /* หา body (หลัง \r\n\r\n) */
         const char *bodyStart=strstr(req,"\r\n\r\n");
