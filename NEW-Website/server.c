@@ -25,7 +25,6 @@
 #define CAR_FILE    "CAR.csv"
 #define CUST_FILE   "CUSTOMER.csv"
 
-
 static void sendResponse(int sock, int code, const char *body);
 static int getJsonStr(const char *json, const char *key, char *out, int outLen);
 static void dayIndexToDate(int dayIdx, char *out);
@@ -148,7 +147,7 @@ static void loadCars(void){
     while(fgets(line,sizeof(line),fp))
     {
         row++;
-        if(row==1) continue; /* skip header */
+        if(row==1) continue;
         if(numCars>=MAX_CARS) break;
 
         Car *c=&cars[numCars];
@@ -165,7 +164,6 @@ static void loadCars(void){
             else if(col==2) strncpy(c->model,tok,63);
             else
             {
-                /* col 3 = day:1, col 4 = day:2, … */
                 if(dayIdx<MAX_DAYS)
                     c->booked[dayIdx]=atoi(tok);
                 dayIdx++;
@@ -180,7 +178,6 @@ static void loadCars(void){
 
 /* ─── save CAR.csv ────────────────────────────────────────── */
 static void saveCars(void){
-    /* อ่าน header  */
     FILE *in=fopen(CAR_FILE,"r");
     char header[20000]="";
     if(in){ fgets(header,sizeof(header),in); fclose(in); }
@@ -188,7 +185,6 @@ static void saveCars(void){
     FILE *fp=fopen(CAR_FILE,"w");
     if(!fp){ fprintf(stderr,"[ERR] cannot write %s\n",CAR_FILE); return; }
 
-    /* เขียน header */
     fprintf(fp,"%s",header);
 
     for(int i=0;i<numCars;i++)
@@ -206,7 +202,7 @@ static int isAvailable(int carIdx, int startDay, int endDay){
     Car *c=&cars[carIdx];
     for(int d=startDay;d<=endDay;d++)
     {
-        int idx=d-1; /* 0-based array */
+        int idx=d-1;
         if(idx>=0 && idx<MAX_DAYS && c->booked[idx]!=0) return 0;
     }
     return 1;
@@ -297,7 +293,6 @@ static int deleteCustomer(const char *fname, const char *lname, int *outCarIdx, 
             if(strcmp(fn,fname)==0&&strcmp(ln,lname)==0)
             {
                 foundLine=count;
-                /* หา carIdx, start, end */
                 char tmp2[512]; strcpy(tmp2,lines[count]);
                 char *m2   =strtok(tmp2,",");
                 char *fn2  =strtok(NULL,",");
@@ -316,7 +311,6 @@ static int deleteCustomer(const char *fname, const char *lname, int *outCarIdx, 
                 }
                 if (m2) strcpy(outModel, m2);
                 if (em2) strcpy(outEmail, em2);
-                /* หา car index จาก model name */
                 *outCarIdx = -1;
                 for (int i = 0; i < numCars; i++)
                 {
@@ -332,8 +326,6 @@ static int deleteCustomer(const char *fname, const char *lname, int *outCarIdx, 
     }
     fclose(fp);
     if(foundLine<0) return 0;
-
-    /* เขียนไฟล์ใหม่โดยข้ามบรรทัดนั้น */
     FILE *out=fopen(CUST_FILE,"w");
     if(!out) return 0;
     for(int i=0;i<count;i++){
