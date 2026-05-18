@@ -396,6 +396,7 @@ static int deleteCustomerByKey(const char *fname, const char *lname, const char 
     if (foundLine < 0) return 0;
 
     FILE *out = fopen(CUST_FILE, "w");
+  /**/
     if (!out) return 0;
     for (int i = 0; i < count; i++) {
         if (i != foundLine) fprintf(out, "%s", lines[i]);
